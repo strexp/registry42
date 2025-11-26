@@ -1,0 +1,1642 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>DN42 IP Resource Viewer</title>
+        <style>
+            body {
+                margin: 0;
+                overflow: hidden;
+                background-color: #050505;
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            }
+            #container {
+                width: 100vw;
+                height: 100vh;
+                display: block;
+            }
+
+            #ui-layer {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                pointer-events: none;
+                display: flex;
+                flex-direction: column;
+                padding: 20px;
+                box-sizing: border-box;
+            }
+
+            .header-group {
+                display: flex;
+                align-items: center;
+                gap: 20px;
+                pointer-events: auto;
+            }
+
+            .header {
+                color: #00ffff;
+                text-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+                font-size: 24px;
+                font-weight: bold;
+                text-transform: uppercase;
+                background: rgba(0, 20, 40, 0.85);
+                padding: 10px 20px;
+                border-left: 4px solid #00ffff;
+                backdrop-filter: blur(5px);
+                box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+            }
+
+            .mode-switch {
+                display: flex;
+                background: rgba(0, 0, 0, 0.8);
+                border: 1px solid #333;
+                border-radius: 4px;
+                overflow: hidden;
+            }
+
+            .mode-btn {
+                padding: 8px 16px;
+                cursor: pointer;
+                color: #888;
+                font-weight: bold;
+                transition: all 0.2s;
+                border: none;
+                background: transparent;
+            }
+            .mode-btn.active {
+                background: rgba(0, 255, 255, 0.2);
+                color: #00ffff;
+                box-shadow: 0 0 10px rgba(0, 255, 255, 0.3) inset;
+            }
+            .mode-btn:hover:not(.active) {
+                color: #fff;
+                background: rgba(255, 255, 255, 0.1);
+            }
+
+            .info-panel {
+                position: absolute;
+                right: 0;
+                top: 100px;
+                background: rgba(0, 0, 0, 0.9);
+                border: 1px solid #333;
+                border-left: 3px solid #00ffff;
+                color: #eee;
+                padding: 20px;
+                width: 320px;
+                font-size: 14px;
+                box-shadow: -5px 5px 20px rgba(0, 0, 0, 0.8);
+                transform: translateX(110%);
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                pointer-events: auto;
+            }
+
+            .info-panel.active {
+                transform: translateX(0);
+            }
+
+            .info-row {
+                margin-bottom: 8px;
+                display: flex;
+                justify-content: space-between;
+                border-bottom: 1px solid #222;
+                padding-bottom: 4px;
+            }
+            .info-label {
+                color: #888;
+                font-size: 12px;
+            }
+            .info-value {
+                color: #fff;
+                font-weight: bold;
+                text-align: right;
+                word-break: break-all;
+                max-width: 65%;
+                font-family: "Consolas", monospace;
+                font-size: 13px;
+            }
+
+            .legend {
+                position: absolute;
+                bottom: 20px;
+                left: 20px;
+                background: rgba(0, 0, 0, 0.85);
+                padding: 15px;
+                border: 1px solid #444;
+                pointer-events: auto;
+                backdrop-filter: blur(2px);
+            }
+            .legend-item {
+                display: flex;
+                align-items: center;
+                margin-bottom: 5px;
+                color: #ccc;
+                font-size: 12px;
+            }
+            .color-box {
+                width: 12px;
+                height: 12px;
+                margin-right: 8px;
+                border: 1px solid #555;
+                box-shadow: 0 0 5px currentColor;
+            }
+
+            .btn-back {
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                background: rgba(0, 255, 255, 0.1);
+                border: 1px solid #00ffff;
+                color: #00ffff;
+                padding: 10px 20px;
+                cursor: pointer;
+                text-transform: uppercase;
+                font-weight: bold;
+                display: none;
+                pointer-events: auto;
+                transition: all 0.2s;
+                box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+                z-index: 100;
+            }
+            .btn-back:hover {
+                background: rgba(0, 255, 255, 0.3);
+                box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+            }
+
+            .scroll-controls {
+                position: absolute;
+                right: 20px;
+                top: 50%;
+                transform: translateY(-50%);
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+                pointer-events: auto;
+                z-index: 50;
+            }
+            .scroll-btn {
+                background: rgba(0, 0, 0, 0.6);
+                border: 1px solid #00ffff;
+                color: #00ffff;
+                width: 50px;
+                height: 50px;
+                cursor: pointer;
+                font-size: 24px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                transition: all 0.2s;
+                backdrop-filter: blur(2px);
+                border-radius: 5px;
+                user-select: none;
+            }
+            .scroll-btn:hover {
+                background: rgba(0, 255, 255, 0.2);
+                box-shadow: 0 0 15px #00ffff;
+            }
+            .scroll-btn:active {
+                transform: scale(0.95);
+            }
+
+            #loader {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: #000;
+                color: #00ffff;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                font-size: 20px;
+                z-index: 999;
+            }
+            .error-msg {
+                color: #ff3333;
+                font-size: 16px;
+                margin-top: 10px;
+                display: none;
+                text-align: center;
+                padding: 20px;
+            }
+        </style>
+
+        <script type="importmap">
+            {
+                "imports": {
+                    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+                }
+            }
+        </script>
+    </head>
+    <body>
+        <div id="loader">
+            <div>SYSTEM INITIALIZING...</div>
+            <div
+                style="font-size: 12px; color: #666; margin-top: 5px"
+                id="loading-text"
+            >
+                Fetching data...
+            </div>
+            <div class="error-msg" id="error-msg"></div>
+        </div>
+
+        <div id="container"></div>
+
+        <div id="ui-layer">
+            <div class="header-group">
+                <div class="header">
+                    DN42 Resource Map
+                    <span
+                        id="current-layer-name"
+                        style="
+                            font-size: 0.6em;
+                            opacity: 0.7;
+                            margin-left: 10px;
+                        "
+                    ></span>
+                </div>
+                <div class="mode-switch">
+                    <button class="mode-btn active" id="mode-v4">IPv4</button>
+                    <button class="mode-btn" id="mode-v6">IPv6</button>
+                </div>
+            </div>
+
+            <div class="scroll-controls" id="scroll-controls">
+                <div class="scroll-btn" id="btn-up">▲</div>
+                <div class="scroll-btn" id="btn-down">▼</div>
+            </div>
+
+            <div class="legend">
+                <div style="margin-bottom: 5px; font-weight: bold; color: #fff">
+                    STATUS LEGEND
+                </div>
+                <div class="legend-item">
+                    <div
+                        class="color-box"
+                        style="background-color: #00ffff; color: #00ffff"
+                    ></div>
+                    ASSIGNED (Active)
+                </div>
+                <div class="legend-item">
+                    <div
+                        class="color-box"
+                        style="background-color: #ffaa00; color: #ffaa00"
+                    ></div>
+                    MIXED (Partial)
+                </div>
+                <div class="legend-item">
+                    <div
+                        class="color-box"
+                        style="background-color: #bd00ff; color: #bd00ff"
+                    ></div>
+                    ALLOCATED (Org)
+                </div>
+                <div class="legend-item">
+                    <div
+                        class="color-box"
+                        style="background-color: #00ff00; color: #00ff00"
+                    ></div>
+                    DN42 OPEN
+                </div>
+                <div class="legend-item">
+                    <div
+                        class="color-box"
+                        style="background-color: #ffff00; color: #ffff00"
+                    ></div>
+                    DN42 ASK
+                </div>
+                <div class="legend-item">
+                    <div
+                        class="color-box"
+                        style="background-color: #ff0000; color: #ff0000"
+                    ></div>
+                    DN42 CLOSED/RESERVED
+                </div>
+                <div class="legend-item">
+                    <div
+                        class="color-box"
+                        style="
+                            background-color: #1a1a1a;
+                            color: #333;
+                            border-color: #333;
+                            box-shadow: none;
+                        "
+                    ></div>
+                    UNALLOCATED
+                </div>
+            </div>
+
+            <button class="btn-back" id="btn-back">Return</button>
+
+            <div class="info-panel" id="info-panel">
+                <div
+                    style="
+                        font-size: 18px;
+                        color: #00ffff;
+                        margin-bottom: 15px;
+                        border-bottom: 1px solid #00ffff;
+                    "
+                >
+                    BLOCK INFO
+                </div>
+                <div id="info-content"></div>
+            </div>
+        </div>
+
+        <script type="module">
+            import * as THREE from "three";
+            import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+            import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+            import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+            import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+            import { Reflector } from "three/addons/objects/Reflector.js";
+            import TWEEN from "three/addons/libs/tween.module.js";
+
+            // ================= CONFIGURATION =================
+            const DATA_V4_PREFIX =
+                "https://bgp-data.strexp.net/registry/prefix.4.json";
+            const DATA_V4_META =
+                "https://bgp-data.strexp.net/registry/meta.4.json";
+            const DATA_V6_PREFIX =
+                "https://bgp-data.strexp.net/registry/prefix.6.json";
+            const DATA_V6_META =
+                "https://bgp-data.strexp.net/registry/meta.6.json";
+
+            const VIEW_START_IP = "172.20.0.0";
+            const VIEW_END_IP = "172.23.255.255";
+
+            // IPv6 Root (DN42)
+            const V6_ROOT_CIDR = "fd00::/8";
+
+            const COLORS = {
+                ASSIGNED: 0x00ffff,
+                MIXED: 0xff7700,
+                ORG_ALLOC: 0xbd00ff,
+                OPEN: 0x00ff00,
+                ASK: 0xffff00,
+                CLOSED: 0xff0000,
+                RESERVED: 0x555555,
+                EMPTY: 0x111111,
+            };
+
+            // ================= HELPERS: BigInt / IPv6 =================
+
+            function parseIPv6(ip) {
+                if (ip.indexOf("::") !== -1) {
+                    const parts = ip.split("::");
+                    const left = parts[0].split(":").filter((p) => p);
+                    const right = parts[1].split(":").filter((p) => p);
+                    const missing = 8 - (left.length + right.length);
+                    const zeros = new Array(missing).fill("0");
+                    ip = [...left, ...zeros, ...right].join(":");
+                }
+                const hex = ip
+                    .split(":")
+                    .map((part) => part.padStart(4, "0"))
+                    .join("");
+                return BigInt("0x" + hex);
+            }
+
+            function formatIPv6(bigint) {
+                let hex = bigint.toString(16).padStart(32, "0");
+                let parts = [];
+                for (let i = 0; i < 32; i += 4) {
+                    parts.push(
+                        hex.substring(i, i + 4).replace(/^0+/, "") || "0",
+                    );
+                }
+                return parts.join(":");
+            }
+
+            function cidrToRangeV6(cidr) {
+                const [ipStr, maskStr] = cidr.split("/");
+                const mask = parseInt(maskStr, 10);
+                const start = parseIPv6(ipStr);
+                const bits = 128n - BigInt(mask);
+                const size = 1n << bits;
+                const end = start + size - 1n;
+                return { start, end, size, mask };
+            }
+
+            // IPv4 Helpers
+            function ip4ToInt(ip) {
+                const parts = ip.split(".");
+                return (
+                    ((parts[0] << 24) |
+                        (parts[1] << 16) |
+                        (parts[2] << 8) |
+                        parts[3]) >>>
+                    0
+                );
+            }
+            function intToIp4(int) {
+                return [
+                    (int >>> 24) & 0xff,
+                    (int >>> 16) & 0xff,
+                    (int >>> 8) & 0xff,
+                    int & 0xff,
+                ].join(".");
+            }
+            function cidrToRangeV4(cidr) {
+                const [ip, maskStr] = cidr.split("/");
+                const mask = parseInt(maskStr, 10);
+                const start = ip4ToInt(ip);
+                const bits = 32 - mask;
+                const count = Math.pow(2, bits);
+                return {
+                    start,
+                    end: (start + count - 1) >>> 0,
+                    size: count,
+                    mask,
+                };
+            }
+
+            // ================= STATE =================
+            let scene, camera, renderer, composer, controls;
+            let raycaster, mouse;
+            let mainGroup;
+            let v4DetailGroup; // Special group for V4 detail view
+
+            let rawData = {
+                v4prefix: null,
+                v4meta: null,
+                v6prefix: null,
+                v6meta: null,
+            };
+            let v4Buckets = new Map();
+            let v6MetaMap = new Map();
+            let v6PrefixTree = null;
+
+            // 'v4_macro', 'v4_detail', 'v6'
+            let currentMode = "v4_macro";
+            let hoveredObject = null;
+
+            // v4 state
+            let v4SelectedLayer = -1;
+            let v4BrowsingLayer = 0;
+            let isScrolling = false;
+
+            // v6 state
+            let v6Stack = [];
+
+            // Visuals
+            let layerHighlightMap = new Map();
+            let crosshairGroup;
+
+            const V4_LIMIT_START = ip4ToInt(VIEW_START_IP);
+            const V4_LIMIT_END = ip4ToInt(VIEW_END_IP);
+
+            // ================= INITIALIZATION =================
+
+            async function initSystem() {
+                document
+                    .getElementById("mode-v4")
+                    .addEventListener("click", () => switchMode("v4_macro"));
+                document
+                    .getElementById("mode-v6")
+                    .addEventListener("click", () => switchMode("v6"));
+                document
+                    .getElementById("btn-back")
+                    .addEventListener("click", handleBack);
+                document
+                    .getElementById("btn-up")
+                    .addEventListener("click", () => v4Navigate(-1));
+                document
+                    .getElementById("btn-down")
+                    .addEventListener("click", () => v4Navigate(1));
+                document.addEventListener("wheel", onScroll, {
+                    passive: false,
+                });
+
+                await loadData();
+                init3D();
+                switchMode("v4_macro");
+                animate();
+            }
+
+            async function loadData() {
+                const txt = document.getElementById("loading-text");
+                txt.innerText = "Downloading Metadata...";
+
+                try {
+                    const [p4, m4, p6, m6] = await Promise.all([
+                        fetch(DATA_V4_PREFIX).then((r) => r.json()),
+                        fetch(DATA_V4_META).then((r) => r.json()),
+                        fetch(DATA_V6_PREFIX).then((r) => r.json()),
+                        fetch(DATA_V6_META).then((r) => r.json()),
+                    ]);
+
+                    rawData = {
+                        v4prefix: p4,
+                        v4meta: m4,
+                        v6prefix: p6,
+                        v6meta: m6,
+                    };
+
+                    txt.innerText = "Processing IPv4 Data...";
+                    await new Promise((r) => setTimeout(r, 10));
+                    processV4Data();
+
+                    txt.innerText = "Processing IPv6 Data...";
+                    await new Promise((r) => setTimeout(r, 10));
+                    processV6Data();
+
+                    document.getElementById("loader").style.display = "none";
+                } catch (e) {
+                    document.getElementById("error-msg").style.display =
+                        "block";
+                    document.getElementById("error-msg").innerText =
+                        "Data Load Failed: " + e.message;
+                    throw e;
+                }
+            }
+
+            function processV4Data() {
+                v4Buckets.clear();
+                for (const [cidr, info] of Object.entries(rawData.v4meta)) {
+                    const range = cidrToRangeV4(cidr);
+                    if (
+                        range.end < V4_LIMIT_START ||
+                        range.start > V4_LIMIT_END
+                    )
+                        continue;
+
+                    const loopStart = Math.max(range.start, V4_LIMIT_START);
+                    const loopEnd = Math.min(range.end, V4_LIMIT_END);
+                    const alignedStart = (loopStart & 0xffffff00) >>> 0;
+                    const alignedEnd = (loopEnd & 0xffffff00) >>> 0;
+
+                    for (
+                        let base = alignedStart;
+                        base <= alignedEnd;
+                        base = (base + 256) >>> 0
+                    ) {
+                        if (!v4Buckets.has(base))
+                            v4Buckets.set(base, {
+                                fullCover: null,
+                                fullCoverMask: -1,
+                                children: [],
+                            });
+                        const bucket = v4Buckets.get(base);
+                        if (range.mask <= 24) {
+                            if (range.mask > bucket.fullCoverMask) {
+                                bucket.fullCover = info;
+                                bucket.fullCoverMask = range.mask;
+                            }
+                        } else {
+                            bucket.children.push({ range, info });
+                        }
+                        if (base === alignedEnd) break;
+                    }
+                }
+            }
+
+            function processV6Data() {
+                for (const [cidr, info] of Object.entries(rawData.v6meta)) {
+                    const range = cidrToRangeV6(cidr);
+                    v6MetaMap.set(range.start, { range, info });
+                }
+                v6PrefixTree = rawData.v6prefix;
+            }
+
+            // ================= 3D SCENE & RENDERING =================
+
+            function init3D() {
+                scene = new THREE.Scene();
+                scene.fog = new THREE.FogExp2(0x050505, 0.001);
+
+                camera = new THREE.PerspectiveCamera(
+                    60,
+                    window.innerWidth / window.innerHeight,
+                    1,
+                    10000,
+                );
+
+                renderer = new THREE.WebGLRenderer({
+                    antialias: true,
+                    alpha: false,
+                });
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.toneMapping = THREE.ReinhardToneMapping;
+                document
+                    .getElementById("container")
+                    .appendChild(renderer.domElement);
+
+                // Floor
+                const geometry = new THREE.PlaneGeometry(5000, 5000);
+                const groundMirror = new Reflector(geometry, {
+                    clipBias: 0.003,
+                    textureWidth:
+                        window.innerWidth * window.devicePixelRatio * 0.25,
+                    textureHeight:
+                        window.innerHeight * window.devicePixelRatio * 0.25,
+                    color: 0x444444,
+                });
+                groundMirror.position.y = -100;
+                groundMirror.rotation.x = -Math.PI / 2;
+                scene.add(groundMirror);
+
+                // Frosted Overlay
+                const noiseCanvas = document.createElement("canvas");
+                noiseCanvas.width = 512;
+                noiseCanvas.height = 512;
+                const ctx = noiseCanvas.getContext("2d");
+                ctx.fillStyle = "#000000";
+                ctx.fillRect(0, 0, 512, 512);
+                for (let i = 0; i < 50000; i++) {
+                    ctx.fillStyle = Math.random() > 0.5 ? "#111111" : "#222222";
+                    ctx.fillRect(
+                        Math.random() * 512,
+                        Math.random() * 512,
+                        2,
+                        2,
+                    );
+                }
+                const noiseTex = new THREE.CanvasTexture(noiseCanvas);
+                noiseTex.wrapS = THREE.RepeatWrapping;
+                noiseTex.wrapT = THREE.RepeatWrapping;
+                noiseTex.repeat.set(20, 20);
+                const overlayMat = new THREE.MeshBasicMaterial({
+                    map: noiseTex,
+                    transparent: true,
+                    opacity: 0.1,
+                    color: 0x000000,
+                    blending: THREE.AdditiveBlending,
+                });
+                const frosted = new THREE.Mesh(
+                    new THREE.PlaneGeometry(5000, 5000),
+                    overlayMat,
+                );
+                frosted.position.y = -99.9;
+                frosted.rotation.x = -Math.PI / 2;
+                scene.add(frosted);
+
+                // Floor Grid Helper (Restored)
+                const floorGrid = new THREE.GridHelper(
+                    5000,
+                    100,
+                    0x00aaaa,
+                    0x222222,
+                );
+                floorGrid.position.y = -99.5;
+                floorGrid.material.transparent = true;
+                floorGrid.material.opacity = 0.3;
+                scene.add(floorGrid);
+
+                const renderScene = new RenderPass(scene, camera);
+                const bloomPass = new UnrealBloomPass(
+                    new THREE.Vector2(window.innerWidth, window.innerHeight),
+                    1.5,
+                    0.4,
+                    0.85,
+                );
+                bloomPass.threshold = 0.1;
+                bloomPass.strength = 0.6;
+                bloomPass.radius = 0.5;
+                composer = new EffectComposer(renderer);
+                composer.addPass(renderScene);
+                composer.addPass(bloomPass);
+
+                controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.maxDistance = 3000;
+
+                raycaster = new THREE.Raycaster();
+                mouse = new THREE.Vector2();
+
+                scene.add(new THREE.AmbientLight(0x404040, 1.2));
+                const dl = new THREE.DirectionalLight(0xffffff, 0.5);
+                dl.position.set(100, 500, 100);
+                scene.add(dl);
+
+                mainGroup = new THREE.Group();
+                scene.add(mainGroup);
+
+                createCrosshair();
+
+                window.addEventListener("resize", () => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                    composer.setSize(window.innerWidth, window.innerHeight);
+                });
+                document.addEventListener("mousemove", onMouseMove);
+                document.addEventListener("click", onClick);
+            }
+
+            // ================= MODE SWITCHING =================
+
+            function switchMode(mode) {
+                handleBack();
+
+                currentMode = mode;
+                const isV4 = mode.startsWith("v4");
+
+                document
+                    .getElementById("mode-v4")
+                    .classList.toggle("active", isV4);
+                document
+                    .getElementById("mode-v6")
+                    .classList.toggle("active", !isV4);
+
+                // Clean
+                if (v4DetailGroup) {
+                    scene.remove(v4DetailGroup);
+                    v4DetailGroup = null;
+                }
+                while (mainGroup.children.length > 0) {
+                    const obj = mainGroup.children[0];
+                    mainGroup.remove(obj);
+                    if (obj.geometry) obj.geometry.dispose();
+                }
+                layerHighlightMap.clear();
+
+                if (isV4) {
+                    document.getElementById("scroll-controls").style.display =
+                        "flex";
+                    v4SelectedLayer = -1;
+                    v4BrowsingLayer = 0;
+                    controls.enableZoom = false;
+                    mainGroup.visible = true;
+
+                    buildV4Scene();
+
+                    camera.position.set(0, 250, 300);
+                    controls.target.set(0, 150, 0);
+                    document.getElementById("current-layer-name").innerText =
+                        "";
+                    document.getElementById("btn-back").style.display = "none";
+                } else {
+                    document.getElementById("scroll-controls").style.display =
+                        "none";
+                    v6Stack = [];
+                    controls.enableZoom = true;
+                    mainGroup.visible = true;
+
+                    renderV6Level(V6_ROOT_CIDR);
+
+                    camera.position.set(0, 400, 0);
+                    controls.target.set(0, 0, 0);
+                    new TWEEN.Tween(camera.position)
+                        .to({ x: 0, y: 200, z: 200 }, 1000)
+                        .easing(TWEEN.Easing.Cubic.Out)
+                        .start();
+                }
+            }
+
+            // ================= V4 LOGIC =================
+
+            function buildV4Scene() {
+                const startIP = ip4ToInt(VIEW_START_IP);
+
+                for (let i = 0; i < 4; i++) {
+                    const layerIPVal = (startIP + i * 65536) >>> 0;
+                    const layerName = intToIp4(layerIPVal) + "/16";
+
+                    const layerGroup = new THREE.Group();
+                    layerGroup.userData = {
+                        type: "layer",
+                        id: i,
+                        baseIP: layerIPVal,
+                        name: layerName,
+                    };
+
+                    createLabel(layerGroup, layerName, -260, 0, 0);
+                    createGridLines(layerGroup);
+                    addCornerLabels(layerGroup); // Restored corner numbers
+
+                    const hl = new THREE.LineSegments(
+                        new THREE.EdgesGeometry(
+                            new THREE.BoxGeometry(162, 4, 162),
+                        ),
+                        new THREE.LineBasicMaterial({
+                            color: 0x00ffff,
+                            transparent: true,
+                            opacity: 0.4,
+                        }),
+                    );
+                    hl.visible = false;
+                    layerHighlightMap.set(i, hl);
+                    layerGroup.add(hl);
+
+                    const boxGeo = new THREE.BoxGeometry(9, 1, 9);
+                    for (let y = 0; y < 16; y++) {
+                        for (let x = 0; x < 16; x++) {
+                            const cellIP =
+                                (layerIPVal + (y * 16 + x) * 256) >>> 0;
+                            const style = getV4BlockStyle(cellIP);
+                            const mat = new THREE.MeshLambertMaterial({
+                                color: style.color,
+                                transparent: true,
+                                opacity:
+                                    style.color === COLORS.EMPTY ? 0.3 : 0.9,
+                                emissive: style.color,
+                                emissiveIntensity:
+                                    style.color === COLORS.EMPTY ? 0 : 0.6,
+                            });
+                            const cube = new THREE.Mesh(boxGeo, mat);
+                            cube.position.set(
+                                (x - 7.5) * 10,
+                                0,
+                                (y - 7.5) * 10,
+                            );
+                            cube.userData = {
+                                type: "v4cell",
+                                ip: cellIP,
+                                cidr: intToIp4(cellIP) + "/24",
+                                info: style.info,
+                                originalColor: style.color,
+                                parentLayer: i,
+                                gridX: x,
+                                gridY: y,
+                            };
+                            layerGroup.add(cube);
+                        }
+                    }
+                    layerGroup.position.y = (3 - i) * 50;
+                    mainGroup.add(layerGroup);
+                }
+            }
+
+            function addCornerLabels(group) {
+                // -7.5 * 10 = -75 (center of first block). Edge is -80.
+                // Label at -80-15 = -95
+                const zOff = -80;
+                createFlatLabel(group, "0", -95, -80);
+                createFlatLabel(group, "15", 95, -80);
+                createFlatLabel(group, "255", 95, 80);
+            }
+
+            function createFlatLabel(group, text, x, z) {
+                const canvas = document.createElement("canvas");
+                canvas.width = 256;
+                canvas.height = 128;
+                const ctx = canvas.getContext("2d");
+                ctx.font = "bold 60px Arial";
+                ctx.fillStyle = "#888888";
+                ctx.textAlign = "center";
+                ctx.fillText(text, 128, 80);
+                const tex = new THREE.CanvasTexture(canvas);
+                const mat = new THREE.MeshBasicMaterial({
+                    map: tex,
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                });
+                const mesh = new THREE.Mesh(
+                    new THREE.PlaneGeometry(30, 15),
+                    mat,
+                );
+                mesh.rotation.x = -Math.PI / 2;
+                mesh.position.set(x, 0, z);
+                group.add(mesh);
+            }
+
+            // function getV4BlockStyle(baseIP) {
+            //     const bucket = v4Buckets.get(baseIP);
+            //     if (!bucket) return { color: COLORS.EMPTY, info: null };
+            //     if (bucket.children.length > 0) {
+            //         return { color: COLORS.MIXED, info: { status: "MIXED", cidr: intToIp4(baseIP)+"/24", netname: `${bucket.children.length} blocks` } };
+            //     }
+            //     if (bucket.fullCover) return resolveColor(bucket.fullCover);
+            //     return { color: COLORS.EMPTY, info: null };
+            // }
+
+            function getV4BlockStyle(baseIP) {
+                const bucket = v4Buckets.get(baseIP);
+
+                if (!bucket) {
+                    return { color: COLORS.EMPTY, info: null };
+                }
+
+                // 检查碎片是否填满了整个 /24
+                if (bucket.children.length > 0) {
+                    const coverage = new Uint8Array(256);
+                    let hasAssigned = false;
+
+                    for (const child of bucket.children) {
+                        const style = resolveColor(child.info);
+                        // 只有状态为 ASSIGNED (青色) 才计入覆盖
+                        if (style.color === COLORS.ASSIGNED) {
+                            hasAssigned = true;
+                            // 计算相对位置
+                            // 注意 child.range.start 是 ip4ToInt 后的数字
+                            const relStart = Math.max(
+                                0,
+                                child.range.start - baseIP,
+                            );
+                            const relEnd = Math.min(
+                                256,
+                                child.range.end - baseIP + 1,
+                            );
+
+                            for (let k = relStart; k < relEnd; k++) {
+                                coverage[k] = 1;
+                            }
+                        }
+                    }
+
+                    // 检查是否全满
+                    let isFullAssigned = hasAssigned;
+                    if (hasAssigned) {
+                        for (let k = 0; k < 256; k++) {
+                            if (coverage[k] === 0) {
+                                isFullAssigned = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    // 如果全满，显示为 ASSIGNED
+                    if (isFullAssigned) {
+                        const combinedInfo = {
+                            status: "ASSIGNED (AGGREGATED)",
+                            cidr: intToIp4(baseIP) + "/24",
+                            netname: `${bucket.children.length} sub-blocks`,
+                            "mnt-by": "MULTIPLE",
+                        };
+                        return { color: COLORS.ASSIGNED, info: combinedInfo };
+                    }
+
+                    // 否则显示为 MIXED
+                    const mixedInfo = {
+                        status: "MIXED ALLOCATION",
+                        cidr: intToIp4(baseIP) + "/24",
+                        netname: `${bucket.children.length} sub-blocks`,
+                        "mnt-by": "MULTIPLE",
+                        range: "Partial usage",
+                    };
+                    return { color: COLORS.MIXED, info: mixedInfo };
+                }
+
+                if (bucket.fullCover) {
+                    return resolveColor(bucket.fullCover);
+                }
+
+                return { color: COLORS.EMPTY, info: null };
+            }
+
+            function v4Navigate(dir) {
+                if (v4SelectedLayer !== -1) return;
+                let next = v4BrowsingLayer + dir;
+                if (next >= 0 && next <= 3) {
+                    v4BrowsingLayer = next;
+                    const y = (3 - next) * 50;
+                    new TWEEN.Tween(camera.position)
+                        .to({ y: y + 100, z: 300 }, 500)
+                        .start();
+                    new TWEEN.Tween(controls.target).to({ y: y }, 500).start();
+                }
+            }
+
+            // ================= V4 DETAIL VIEW =================
+
+            function enterV4Detail(ip, cidr) {
+                currentMode = "v4_detail";
+                document.getElementById("scroll-controls").style.display =
+                    "none";
+                document.getElementById("btn-back").style.display = "block";
+                document.getElementById("btn-back").innerText =
+                    "Return to Layer";
+                document.getElementById("current-layer-name").innerText =
+                    "> " + cidr;
+                controls.enableZoom = true;
+
+                // Hide Macro
+                new TWEEN.Tween(mainGroup.scale)
+                    .to({ x: 0, y: 0, z: 0 }, 400)
+                    .onComplete(() => {
+                        mainGroup.visible = false;
+                    })
+                    .start();
+
+                // Build Detail
+                buildV4DetailView(ip);
+
+                // Anim
+                v4DetailGroup.scale.set(0, 0, 0);
+                new TWEEN.Tween(v4DetailGroup.scale)
+                    .to({ x: 1, y: 1, z: 1 }, 800)
+                    .easing(TWEEN.Easing.Elastic.Out)
+                    .start();
+                new TWEEN.Tween(camera.position)
+                    .to({ x: 0, y: 180, z: 0 }, 1000)
+                    .easing(TWEEN.Easing.Quadratic.Out)
+                    .start();
+                controls.target.set(0, 0, 0);
+            }
+
+            function buildV4DetailView(baseIP) {
+                if (v4DetailGroup) scene.remove(v4DetailGroup);
+                v4DetailGroup = new THREE.Group();
+
+                createGridLines(v4DetailGroup);
+                createLabel(
+                    v4DetailGroup,
+                    intToIp4(baseIP) + "/24",
+                    -260,
+                    0,
+                    0,
+                );
+                addCornerLabels(v4DetailGroup); // 0, 15, 255 for micro view too
+
+                const bucket = v4Buckets.get(baseIP);
+                const geo = new THREE.BoxGeometry(9, 2, 9);
+
+                for (let i = 0; i < 256; i++) {
+                    const currentIP = (baseIP + i) >>> 0;
+                    let style = { color: COLORS.EMPTY, info: null };
+
+                    // Check children
+                    let bestMask = -1;
+                    if (bucket && bucket.fullCover) {
+                        style = resolveColor(bucket.fullCover);
+                        bestMask = bucket.fullCoverMask;
+                    }
+                    if (bucket && bucket.children) {
+                        for (const child of bucket.children) {
+                            if (
+                                currentIP >= child.range.start &&
+                                currentIP <= child.range.end
+                            ) {
+                                if (child.range.mask > bestMask) {
+                                    style = resolveColor(child.info);
+                                    bestMask = child.range.mask;
+                                }
+                            }
+                        }
+                    }
+
+                    const isEmpty = style.color === COLORS.EMPTY;
+                    const mat = new THREE.MeshLambertMaterial({
+                        color: style.color,
+                        transparent: true,
+                        opacity: isEmpty ? 0.3 : 0.95,
+                        emissive: style.color,
+                        emissiveIntensity: isEmpty ? 0 : 0.7,
+                    });
+                    const cube = new THREE.Mesh(geo, mat);
+                    const x = i % 16;
+                    const y = Math.floor(i / 16);
+                    cube.position.set((x - 7.5) * 10, 0, (y - 7.5) * 10);
+                    cube.userData = {
+                        type: "v4cell_micro",
+                        ip: currentIP,
+                        cidr: intToIp4(currentIP) + "/32",
+                        info: style.info,
+                        originalColor: style.color,
+                        gridX: x,
+                        gridY: y,
+                    };
+                    v4DetailGroup.add(cube);
+                }
+                scene.add(v4DetailGroup);
+            }
+
+            // ================= V6 LOGIC =================
+
+            function renderV6Level(prefixCidr) {
+                while (mainGroup.children.length > 0)
+                    mainGroup.remove(mainGroup.children[0]);
+
+                const currentRange = cidrToRangeV6(prefixCidr);
+                const [ipStr, maskStr] = prefixCidr.split("/");
+                const currentMask = parseInt(maskStr);
+                const nextMask = currentMask + 12;
+                const stepSize = 1n << (128n - BigInt(nextMask));
+
+                const group = new THREE.Group();
+                createLabel(group, prefixCidr, -500, 0, 0);
+
+                // V6 Grid Lines (64x64)
+                const lineMat = new THREE.LineBasicMaterial({
+                    color: 0x444444,
+                    transparent: true,
+                    opacity: 0.5,
+                });
+                const pts = [
+                    new THREE.Vector3(-320, 0, -320),
+                    new THREE.Vector3(320, 0, -320),
+                    new THREE.Vector3(320, 0, 320),
+                    new THREE.Vector3(-320, 0, 320),
+                    new THREE.Vector3(-320, 0, -320),
+                ];
+                group.add(
+                    new THREE.Line(
+                        new THREE.BufferGeometry().setFromPoints(pts),
+                        lineMat,
+                    ),
+                );
+
+                const boxGeo = new THREE.BoxGeometry(9, 2, 9);
+
+                for (let y = 0; y < 64; y++) {
+                    for (let x = 0; x < 64; x++) {
+                        const cellIndex = BigInt(y * 64 + x);
+                        const cellStart =
+                            currentRange.start + cellIndex * stepSize;
+                        const cellEnd = cellStart + stepSize - 1n;
+
+                        const style = getV6BlockStyle(
+                            cellStart,
+                            cellEnd,
+                            nextMask,
+                        );
+                        const isEmpty = style.color === COLORS.EMPTY;
+
+                        const mat = new THREE.MeshLambertMaterial({
+                            color: style.color,
+                            transparent: true,
+                            opacity: isEmpty ? 0.1 : 0.9,
+                            emissive: style.color,
+                            emissiveIntensity: isEmpty ? 0 : 0.6,
+                        });
+
+                        const cube = new THREE.Mesh(boxGeo, mat);
+                        cube.position.set((x - 31.5) * 10, 0, (y - 31.5) * 10);
+
+                        const cellCidr = formatIPv6(cellStart) + "/" + nextMask;
+
+                        cube.userData = {
+                            type: "v6cell",
+                            cidr: cellCidr,
+                            info: style.info,
+                            originalColor: style.color,
+                            gridX: x,
+                            gridY: y,
+                        };
+                        group.add(cube);
+                    }
+                }
+                mainGroup.add(group);
+
+                document.getElementById("current-layer-name").innerText =
+                    "> " + prefixCidr;
+                const btn = document.getElementById("btn-back");
+                if (v6Stack.length > 0) {
+                    btn.style.display = "block";
+                    btn.innerText = "Level Up";
+                } else {
+                    btn.style.display = "none";
+                }
+            }
+
+            function getV6BlockStyle(start, end, mask) {
+                if (v6MetaMap.has(start)) {
+                    const entry = v6MetaMap.get(start);
+                    if (entry.range.mask <= mask)
+                        return resolveColor(entry.info);
+                }
+                const status = checkTree(v6PrefixTree, start, end);
+                if (status.found) {
+                    if (status.type === "exact" || status.type === "parent")
+                        return resolveColor(status.info);
+                    if (status.type === "child")
+                        return {
+                            color: COLORS.MIXED,
+                            info: {
+                                status: "MIXED",
+                                netname: "Sub-allocations",
+                            },
+                        };
+                }
+                return { color: COLORS.EMPTY, info: null };
+            }
+
+            function checkTree(node, cellStart, cellEnd) {
+                if (!node) return { found: false };
+                if (!node._parsed) node._parsed = cidrToRangeV6(node.prefix);
+                const nodeRange = node._parsed;
+
+                if (nodeRange.start <= cellStart && nodeRange.end >= cellEnd) {
+                    const meta = v6MetaMap.get(nodeRange.start);
+                    if (node.children) {
+                        for (const child of node.children) {
+                            const res = checkTree(child, cellStart, cellEnd);
+                            if (res.found) return res;
+                        }
+                    }
+                    if (meta && meta.range.mask === nodeRange.mask)
+                        return { found: true, type: "parent", info: meta.info };
+                }
+
+                if (nodeRange.start >= cellStart && nodeRange.start <= cellEnd)
+                    return { found: true, type: "child" };
+                if (nodeRange.end < cellStart || nodeRange.start > cellEnd)
+                    return { found: false };
+
+                if (node.children) {
+                    for (const child of node.children) {
+                        const res = checkTree(child, cellStart, cellEnd);
+                        if (res.found) return res;
+                    }
+                }
+                return { found: false };
+            }
+
+            // ================= INTERACTION =================
+
+            function onClick() {
+                if (!hoveredObject) {
+                    //     if (currentMode === 'v4_macro' && v4SelectedLayer !== -1) resetV4Focus();
+                    return;
+                }
+
+                const d = hoveredObject.userData;
+
+                if (currentMode === "v4_macro") {
+                    if (d.type === "v4cell") {
+                        if (v4SelectedLayer !== d.parentLayer) {
+                            focusV4Layer(d.parentLayer);
+                        } else {
+                            enterV4Detail(d.ip, d.cidr);
+                        }
+                    }
+                } else if (currentMode === "v6") {
+                    const [ip, mask] = d.cidr.split("/");
+                    if (parseInt(mask) < 128) {
+                        v6Stack.push(
+                            document
+                                .getElementById("current-layer-name")
+                                .innerText.substring(2),
+                        );
+                        renderV6Level(d.cidr);
+                        new TWEEN.Tween(camera.position)
+                            .to(
+                                {
+                                    y: camera.position.y - 50,
+                                    z: camera.position.z - 50,
+                                },
+                                300,
+                            )
+                            .yoyo(true)
+                            .repeat(1)
+                            .start();
+                    }
+                }
+            }
+
+            function handleBack() {
+                if (currentMode === "v4_detail") {
+                    currentMode = "v4_macro";
+                    controls.enableZoom = false;
+                    document.getElementById("btn-back").innerText =
+                        "Reset View";
+
+                    new TWEEN.Tween(v4DetailGroup.scale)
+                        .to({ x: 0, y: 0, z: 0 }, 400)
+                        .onComplete(() => {
+                            scene.remove(v4DetailGroup);
+                            v4DetailGroup = null;
+                        })
+                        .start();
+                    mainGroup.visible = true;
+                    new TWEEN.Tween(mainGroup.scale)
+                        .to({ x: 1, y: 1, z: 1 }, 400)
+                        .start();
+                    new TWEEN.Tween(camera.position)
+                        .to({ x: 0, y: 220, z: 150 }, 800)
+                        .start();
+
+                    const layerName = mainGroup.children.find(
+                        (g) => g.userData.id === v4SelectedLayer,
+                    )?.userData.name;
+                    document.getElementById("current-layer-name").innerText =
+                        "> " + (layerName || "");
+                } else if (
+                    currentMode === "v4_macro" &&
+                    v4SelectedLayer !== -1
+                ) {
+                    resetV4Focus();
+                } else if (currentMode === "v6") {
+                    if (v6Stack.length > 0) {
+                        const prev = v6Stack.pop();
+                        renderV6Level(prev);
+                    }
+                }
+            }
+
+            function focusV4Layer(idx) {
+                v4SelectedLayer = idx;
+                document.getElementById("scroll-controls").style.display =
+                    "none";
+                document.getElementById("btn-back").style.display = "block";
+                document.getElementById("btn-back").innerText = "Reset View";
+
+                mainGroup.children.forEach((g) => {
+                    if (g.userData.id === idx) {
+                        new TWEEN.Tween(g.position).to({ y: 0 }, 800).start();
+                        g.children.forEach((c) => {
+                            if (c.material)
+                                c.material.opacity =
+                                    c.userData.originalColor === COLORS.EMPTY
+                                        ? 0.3
+                                        : 0.9;
+                        });
+                    } else {
+                        new TWEEN.Tween(g.position)
+                            .to({ y: (g.userData.id - idx) * 400 }, 800)
+                            .start();
+                        g.children.forEach((c) => {
+                            if (c.material) c.material.opacity = 0.05;
+                        });
+                    }
+                });
+
+                // Reset camera focus
+                new TWEEN.Tween(camera.position)
+                    .to({ x: 0, y: 220, z: 150 }, 1000)
+                    .easing(TWEEN.Easing.Cubic.Out)
+                    .start();
+                new TWEEN.Tween(controls.target)
+                    .to({ x: 0, y: 0, z: 0 }, 1000)
+                    .easing(TWEEN.Easing.Cubic.Out)
+                    .start();
+            }
+
+            function resetV4Focus() {
+                v4SelectedLayer = -1;
+                document.getElementById("scroll-controls").style.display =
+                    "flex";
+                document.getElementById("btn-back").style.display = "none";
+                document.getElementById("current-layer-name").innerText = "";
+
+                mainGroup.children.forEach((g) => {
+                    new TWEEN.Tween(g.position)
+                        .to({ y: (3 - g.userData.id) * 50 }, 800)
+                        .start();
+                    g.children.forEach((c) => {
+                        if (c.material)
+                            c.material.opacity =
+                                c.userData.originalColor === COLORS.EMPTY
+                                    ? 0.3
+                                    : 0.9;
+                    });
+                });
+
+                // Restore scroll view position
+                const y = (3 - v4BrowsingLayer) * 50;
+                new TWEEN.Tween(camera.position)
+                    .to({ y: y + 100, z: 300 }, 600)
+                    .start();
+                new TWEEN.Tween(controls.target).to({ y: y }, 600).start();
+
+                layerHighlightMap.forEach((h) => (h.visible = false));
+            }
+
+            function onScroll(event) {
+                if (currentMode === "v4_macro" && v4SelectedLayer === -1) {
+                    if (isScrolling) return;
+                    const direction = event.deltaY > 0 ? 1 : -1;
+                    v4Navigate(direction);
+                    isScrolling = true;
+                    setTimeout(() => {
+                        isScrolling = false;
+                    }, 300);
+                }
+            }
+
+            // ================= COMMON UTILS =================
+
+            function createLabel(group, text, x, y, z) {
+                const canvas = document.createElement("canvas");
+                canvas.width = 4096;
+                canvas.height = 512;
+                const ctx = canvas.getContext("2d");
+                ctx.font = "bold 128px Arial";
+                ctx.fillStyle = "#00ffff";
+                ctx.textAlign = "right";
+                ctx.shadowColor = "#00ffff";
+                ctx.shadowBlur = 10;
+                ctx.fillText(text, 4096, 256);
+                const tex = new THREE.CanvasTexture(canvas);
+                const mat = new THREE.MeshBasicMaterial({
+                    map: tex,
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending,
+                });
+                const mesh = new THREE.Mesh(
+                    new THREE.PlaneGeometry(320, 40),
+                    mat,
+                );
+                mesh.rotation.x = -Math.PI / 2;
+                mesh.position.set(x, y, z);
+                group.add(mesh);
+            }
+
+            function createGridLines(group) {
+                const lineMat = new THREE.LineBasicMaterial({
+                    color: 0x444444,
+                    transparent: true,
+                    opacity: 0.5,
+                });
+                const pts = [
+                    new THREE.Vector3(-80, 0, -80),
+                    new THREE.Vector3(80, 0, -80),
+                    new THREE.Vector3(80, 0, 80),
+                    new THREE.Vector3(-80, 0, 80),
+                    new THREE.Vector3(-80, 0, -80),
+                ];
+                group.add(
+                    new THREE.Line(
+                        new THREE.BufferGeometry().setFromPoints(pts),
+                        lineMat,
+                    ),
+                );
+            }
+
+            function createCrosshair() {
+                // crosshairGroup = new THREE.Group();
+                // const mat = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.6 });
+                // // Create unit size lines, scale later
+                // const rowGeo = new THREE.BoxGeometry(1, 1.2, 9.5); // Scalable width X
+                // crosshairGroup.add(new THREE.Mesh(rowGeo, mat));
+
+                // const colGeo = new THREE.BoxGeometry(9.5, 1.2, 1); // Scalable depth Z
+                // crosshairGroup.add(new THREE.Mesh(colGeo, mat));
+
+                // crosshairGroup.visible = false;
+                // scene.add(crosshairGroup);
+                crosshairGroup = new THREE.Group();
+                crosshairGroup.visible = false;
+
+                const rowGeo = new THREE.BoxGeometry(40, 1.2, 9.5);
+                const edgesRow = new THREE.EdgesGeometry(rowGeo);
+                const rowMesh = new THREE.LineSegments(
+                    edgesRow,
+                    new THREE.LineBasicMaterial({
+                        color: 0x00ffff,
+                        transparent: true,
+                        opacity: 0.6,
+                    }),
+                );
+
+                const colGeo = new THREE.BoxGeometry(9.5, 1.2, 40);
+                const edgesCol = new THREE.EdgesGeometry(colGeo);
+                const colMesh = new THREE.LineSegments(
+                    edgesCol,
+                    new THREE.LineBasicMaterial({
+                        color: 0x00ffff,
+                        transparent: true,
+                        opacity: 0.6,
+                    }),
+                );
+
+                crosshairGroup.add(rowMesh);
+                crosshairGroup.add(colMesh);
+
+                scene.add(crosshairGroup);
+            }
+
+            function onMouseMove(event) {
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+
+                const target =
+                    currentMode === "v4_detail" && v4DetailGroup
+                        ? v4DetailGroup
+                        : mainGroup;
+                if (!target.visible) return;
+
+                const intersects = raycaster.intersectObjects(
+                    target.children,
+                    true,
+                );
+                const hit = intersects.find((o) => o.object.userData.type);
+
+                crosshairGroup.visible = false;
+                if (currentMode === "v4_macro")
+                    layerHighlightMap.forEach((h) => (h.visible = false));
+
+                if (hit) {
+                    const obj = hit.object;
+                    const d = obj.userData;
+
+                    if (currentMode === "v4_macro") {
+                        const hl = layerHighlightMap.get(d.parentLayer);
+                        if (hl) hl.visible = true;
+                    }
+
+                    // Crosshair Scaling & Positioning
+                    crosshairGroup.visible = true;
+                    const worldPos = new THREE.Vector3();
+                    obj.getWorldPosition(worldPos);
+
+                    // Adjust Width/Offset based on V4/V6
+                    let gridW = 160;
+                    let offset = 7.5;
+                    if (currentMode === "v6") {
+                        gridW = 640;
+                        offset = 31.5;
+                    } else if (currentMode === "v4_detail") {
+                        // detail view is same size as macro layer (16x16)
+                        gridW = 160;
+                        offset = 7.5;
+                    }
+
+                    crosshairGroup.children[0].scale.set(gridW, 1, 1); // X-bar
+                    crosshairGroup.children[1].scale.set(1, 1, gridW); // Z-bar
+
+                    const gridX = (d.gridX - offset) * 10;
+                    const gridZ = (d.gridY - offset) * 10;
+
+                    // Relative position from center of grid
+                    crosshairGroup.children[0].position.set(0, 0, gridZ);
+                    crosshairGroup.children[1].position.set(gridX, 0, 0);
+
+                    // Group height
+                    crosshairGroup.position.set(0, worldPos.y, 0);
+                    if (
+                        currentMode === "v4_macro" &&
+                        d.parentLayer !== undefined
+                    ) {
+                        // In macro mode, obj is inside a group that is offset Y.
+                        // We want crosshair at group center (0,Y,0) relative to world, children offset.
+                        // Actually simpler: Set group to 0,0,0, set children to world X/Z/Y?
+                        // No, easier to set group to 0,WorldY,0.
+                    }
+
+                    if (hoveredObject !== obj) {
+                        if (hoveredObject)
+                            hoveredObject.material.emissive.setHex(
+                                hoveredObject.userData.originalColor,
+                            );
+                        hoveredObject = obj;
+                        obj.material.emissive.setHex(0xffffff);
+                        updateInfoPanel(d);
+                    }
+                    document.body.style.cursor = "pointer";
+                } else {
+                    if (hoveredObject) {
+                        hoveredObject.material.emissive.setHex(
+                            hoveredObject.userData.originalColor,
+                        );
+                        hoveredObject = null;
+                        document
+                            .getElementById("info-panel")
+                            .classList.remove("active");
+                    }
+                    document.body.style.cursor = "default";
+                }
+            }
+
+            function resolveColor(info) {
+                if (!info) return { color: COLORS.EMPTY, info: null };
+                let color = COLORS.RESERVED;
+                const status = (info.status || "").toUpperCase();
+                const mnt = (info["mnt-by"] || "").toUpperCase();
+                const policy = (info.policy || "").toLowerCase();
+
+                if (status.includes("ALLOCATED")) {
+                    if (mnt === "DN42-MNT") {
+                        if (policy === "open") color = COLORS.OPEN;
+                        else if (policy === "ask") color = COLORS.ASK;
+                        else color = COLORS.CLOSED;
+                    } else {
+                        color = COLORS.ORG_ALLOC;
+                    }
+                } else if (status.includes("ASSIGNED")) {
+                    color = COLORS.ASSIGNED;
+                }
+                return { color, info, type: "NORMAL" };
+            }
+
+            function updateInfoPanel(data) {
+                const p = document.getElementById("info-panel");
+                const c = document.getElementById("info-content");
+                p.classList.add("active");
+                const i = data.info || {};
+                let h = `<div class="info-row"><span class="info-label">CIDR</span><span class="info-value">${data.cidr}</span></div>`;
+                h += `<div class="info-row"><span class="info-label">Status</span><span class="info-value" style="color:${"#" + data.originalColor.toString(16).padStart(6, "0")}">${i.status || (data.originalColor === COLORS.MIXED ? i.status : "UNALLOCATED")}</span></div>`;
+                if (i.netname)
+                    h += `<div class="info-row"><span class="info-label">Netname</span><span class="info-value">${i.netname}</span></div>`;
+                if (i["mnt-by"])
+                    h += `<div class="info-row"><span class="info-label">Mnt-by</span><span class="info-value">${i["mnt-by"]}</span></div>`;
+                if (i.country)
+                    h += `<div class="info-row"><span class="info-label">Country</span><span class="info-value">${i.country}</span></div>`;
+                if (i.policy)
+                    h += `<div class="info-row"><span class="info-label">Policy</span><span class="info-value">${i.policy}</span></div>`;
+                c.innerHTML = h;
+            }
+
+            function animate() {
+                requestAnimationFrame(animate);
+                TWEEN.update();
+                controls.update();
+                composer.render();
+            }
+
+            // Start
+            initSystem();
+        </script>
+    </body>
+</html>
