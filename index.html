@@ -631,13 +631,79 @@
 
                 // Floor
                 const geometry = new THREE.PlaneGeometry(5000, 5000);
+
+                const fuzzyReflectorShader = {
+                    uniforms: {
+                        color: { value: null },
+                        tDiffuse: { value: null },
+                        textureMatrix: { value: null },
+                    },
+                    vertexShader: `
+                        uniform mat4 textureMatrix;
+                        varying vec4 vUv;
+                        #include <common>
+                        #include <logdepthbuf_pars_vertex>
+                        void main() {
+                            vUv = textureMatrix * vec4( position, 1.0 );
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+                            #include <logdepthbuf_vertex>
+                        }`,
+                    fragmentShader: `
+                        uniform vec3 color;
+                        uniform sampler2D tDiffuse;
+                        varying vec4 vUv;
+                        #include <logdepthbuf_pars_fragment>
+                        
+                        float blendOverlay( float base, float blend ) {
+                            return( base < 0.5 ? ( 2.0 * base * blend ) : ( 1.0 - 2.0 * ( 1.0 - base ) * ( 1.0 - blend ) ) );
+                        }
+                        vec3 blendOverlay( vec3 base, vec3 blend ) {
+                            return vec3( blendOverlay( base.r, color.r ), blendOverlay( base.g, color.g ), blendOverlay( base.b, color.b ) );
+                        }
+                        
+                        void main() {
+                            #include <logdepthbuf_fragment>
+                            
+                            vec4 base = vec4(0.0);
+                            float total = 0.0;
+                            
+                            float blurAmount = 0.5; 
+                            
+                            // sampling 3x3
+                            float offsets[3];
+                            offsets[0] = -blurAmount;
+                            offsets[1] = 0.0;
+                            offsets[2] = blurAmount;
+                            
+                            for (int i = 0; i < 3; i++) {
+                                for (int j = 0; j < 3; j++) {
+                                    // based on distance
+                                    float weight = 1.0 - (abs(offsets[i]) + abs(offsets[j])) * 100.0;
+                                    weight = clamp(weight, 0.5, 1.0);
+                                    
+                                    vec4 sampleUV = vUv + vec4(offsets[i], offsets[j], 0.0, 0.0);
+                                    base += texture2DProj( tDiffuse, sampleUV ) * weight;
+                                    total += weight;
+                                }
+                            }
+                            
+                            base /= total;
+                            
+                            gl_FragColor = vec4( blendOverlay( base.rgb, color ), 1.0 );
+                            
+                            // background mix
+                            gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.01), 0.6);
+                        }`,
+                };
+
                 const groundMirror = new Reflector(geometry, {
                     clipBias: 0.003,
                     textureWidth:
-                        window.innerWidth * window.devicePixelRatio * 0.25,
+                        window.innerWidth * window.devicePixelRatio * 0.5,
                     textureHeight:
-                        window.innerHeight * window.devicePixelRatio * 0.25,
+                        window.innerHeight * window.devicePixelRatio * 0.5,
                     color: 0x444444,
+                    shader: fuzzyReflectorShader,
                 });
                 groundMirror.position.y = -100;
                 groundMirror.rotation.x = -Math.PI / 2;
