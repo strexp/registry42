@@ -1055,7 +1055,7 @@
                     v4BrowsingLayer = next;
                     const y = (3 - next) * 50;
                     new TWEEN.Tween(camera.position)
-                        .to({ y: y + 100, z: 300 }, 500)
+                        .to({ y: y + 100 }, 500)
                         .start();
                     new TWEEN.Tween(controls.target).to({ y: y }, 500).start();
                 }
@@ -1089,10 +1089,10 @@
                 v4DetailGroup.scale.set(0, 0, 0);
                 new TWEEN.Tween(v4DetailGroup.scale)
                     .to({ x: 1, y: 1, z: 1 }, 800)
-                    .easing(TWEEN.Easing.Elastic.Out)
+                    .easing(TWEEN.Easing.Quadratic.Out)
                     .start();
                 new TWEEN.Tween(camera.position)
-                    .to({ x: 0, y: 180, z: 0 }, 1000)
+                    .to({ y: 180 }, 1000)
                     .easing(TWEEN.Easing.Quadratic.Out)
                     .start();
                 controls.target.set(0, 0, 0);
@@ -1351,7 +1351,6 @@
             function handleBack() {
                 if (currentMode === "v4_detail") {
                     currentMode = "v4_macro";
-                    controls.enableZoom = false;
                     document.getElementById("btn-back").innerText =
                         "Reset View";
 
@@ -1379,6 +1378,7 @@
                     currentMode === "v4_macro" &&
                     v4SelectedLayer !== -1
                 ) {
+                    controls.enableZoom = false;
                     resetV4Focus();
                 } else if (currentMode === "v6") {
                     if (v6Stack.length > 0) {
@@ -1390,6 +1390,7 @@
 
             function focusV4Layer(idx) {
                 v4SelectedLayer = idx;
+                controls.enableZoom = true;
                 document.getElementById("scroll-controls").style.display =
                     "none";
                 document.getElementById("btn-back").style.display = "block";
@@ -1417,7 +1418,7 @@
 
                 // Reset camera focus
                 new TWEEN.Tween(camera.position)
-                    .to({ x: 0, y: 220, z: 150 }, 1000)
+                    .to({ y: 220 }, 1000)
                     .easing(TWEEN.Easing.Cubic.Out)
                     .start();
                 new TWEEN.Tween(controls.target)
