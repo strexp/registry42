@@ -415,7 +415,9 @@
             }
 
             function cidrToRangeV6(cidr) {
-                const [ipStr, maskStr] = cidr.split("/");
+                const [ipStr, maskStr] = cidr.includes("/")
+                    ? cidr.split("/")
+                    : cidr.split("_");
                 const mask = parseInt(maskStr, 10);
                 const start = parseIPv6(ipStr);
                 const bits = 128n - BigInt(mask);
@@ -444,7 +446,7 @@
                 ].join(".");
             }
             function cidrToRangeV4(cidr) {
-                const [ip, maskStr] = cidr.split("/");
+                const [ip, maskStr] = cidr.split("_");
                 const mask = parseInt(maskStr, 10);
                 const start = ip4ToInt(ip);
                 const bits = 32 - mask;
@@ -653,44 +655,44 @@
                         uniform sampler2D tDiffuse;
                         varying vec4 vUv;
                         #include <logdepthbuf_pars_fragment>
-                        
+
                         float blendOverlay( float base, float blend ) {
                             return( base < 0.5 ? ( 2.0 * base * blend ) : ( 1.0 - 2.0 * ( 1.0 - base ) * ( 1.0 - blend ) ) );
                         }
                         vec3 blendOverlay( vec3 base, vec3 blend ) {
                             return vec3( blendOverlay( base.r, color.r ), blendOverlay( base.g, color.g ), blendOverlay( base.b, color.b ) );
                         }
-                        
+
                         void main() {
                             #include <logdepthbuf_fragment>
-                            
+
                             vec4 base = vec4(0.0);
                             float total = 0.0;
-                            
-                            float blurAmount = 0.5; 
-                            
+
+                            float blurAmount = 0.5;
+
                             // sampling 3x3
                             float offsets[3];
                             offsets[0] = -blurAmount;
                             offsets[1] = 0.0;
                             offsets[2] = blurAmount;
-                            
+
                             for (int i = 0; i < 3; i++) {
                                 for (int j = 0; j < 3; j++) {
                                     // based on distance
                                     float weight = 1.0 - (abs(offsets[i]) + abs(offsets[j])) * 100.0;
                                     weight = clamp(weight, 0.5, 1.0);
-                                    
+
                                     vec4 sampleUV = vUv + vec4(offsets[i], offsets[j], 0.0, 0.0);
                                     base += texture2DProj( tDiffuse, sampleUV ) * weight;
                                     total += weight;
                                 }
                             }
-                            
+
                             base /= total;
-                            
+
                             gl_FragColor = vec4( blendOverlay( base.rgb, color ), 1.0 );
-                            
+
                             // background mix
                             gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.01), 0.6);
                         }`,
@@ -1261,8 +1263,9 @@
                 }
                 const status = checkTree(v6PrefixTree, start, end);
                 if (status.found) {
-                    if (status.type === "exact" || status.type === "parent")
+                    if (status.type === "exact" || status.type === "parent") {
                         return resolveColor(status.info);
+                    }
                     if (status.type === "child")
                         return {
                             color: COLORS.MIXED,
@@ -1277,7 +1280,7 @@
 
             function checkTree(node, cellStart, cellEnd) {
                 if (!node) return { found: false };
-                if (!node._parsed) node._parsed = cidrToRangeV6(node.prefix);
+                if (!node._parsed) node._parsed = cidrToRangeV6(node.cidr);
                 const nodeRange = node._parsed;
 
                 if (nodeRange.start <= cellStart && nodeRange.end >= cellEnd) {
@@ -1659,9 +1662,9 @@
             function resolveColor(info) {
                 if (!info) return { color: COLORS.EMPTY, info: null };
                 let color = COLORS.RESERVED;
-                const status = (info.status || "").toUpperCase();
-                const mnt = (info["mnt-by"] || "").toUpperCase();
-                const policy = (info.policy || "").toLowerCase();
+                const status = (info.status?.[0] || "").toUpperCase();
+                const mnt = (info["mnt-by"]?.[0] || "").toUpperCase();
+                const policy = (info.policy?.[0] || "").toLowerCase();
 
                 if (status.includes("ALLOCATED")) {
                     if (mnt === "DN42-MNT") {
